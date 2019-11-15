@@ -3,10 +3,12 @@ import ipaddress
 
 serverPort = 67
 clientPort = 68
+
 MAX_BYTES=1024
+
 dest = ('127.0.0.1', clientPort)
 class DHCP_server(object):
-    start_ip = ipaddress.IPv4Address('192.168.1.2')
+    start_ip = ipaddress.IPv4Address('192.168.1.1')
     end_ip = ipaddress.IPv4Address('192.168.1.101')
     addresses = [start_ip]
     for ip_int in range(int(start_ip) + 1, int(end_ip)):
@@ -14,7 +16,7 @@ class DHCP_server(object):
     def server(self):
         print("DHCP server is starting")
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #AF_INET ne da tipul de adresa(IPv4) si SOCK_DGRAM ne indica tipul de socket folosit(UDP)
-        s.bind(("127.0.0.1", serverPort))
+        s.bind(("0.0.0.0", serverPort))
         while True:
             print("Wait DHCP discovery.")
             data, address=s.recvfrom(MAX_BYTES)
@@ -26,12 +28,12 @@ class DHCP_server(object):
                 while True:
                     print("Wait DHCP request.")
                     data2, address2 = s.recvfrom(MAX_BYTES)
-                    # if data2.decode("utf-8") == "DHCPREQUEST":
-                    #     print(f"DHCP request received from {address2}")
-                    #     print("Send DHCP pack.")
-                    #     dhcpreq=DHCP_server.pack_get()
-                    #     s.sendto(dhcpreq, dest)
-                    #     break
+                    if data2.decode("utf-8") == "DHCPREQUEST":
+                        print(f"DHCP request received from {address2}")
+                        print("Send DHCP ack.")
+                        dhcpreq=DHCP_server.pack_get()
+                        s.sendto(dhcpreq, dest)
+                        break
 
     #DHCPOFFER
     def offer_get():
@@ -55,6 +57,7 @@ class DHCP_server(object):
         CHADDR5 = bytes(192)
 
         Magiccookie = bytes([0x63, 0x82, 0x53, 0x63])
+
         DHCPOptions1 = bytes([53, 1, 2])  # DHCP Offer
         DHCPOptions2 = bytes([1, 4, 0xFF, 0xFF, 0xFF, 0x00])  # 255.255.255.0 subnet mask
         DHCPOptions3 = bytes([3, 4, 0xC0, 0xA8, 0x01, 0x01])  # 192.168.1.1 router
@@ -65,7 +68,7 @@ class DHCP_server(object):
 
         return package
 
-    #DHCPPACK
+    #DHCPACK
     def pack_get():
         OP = bytes([0x02])
         HTYPE = bytes([0x01])
@@ -78,12 +81,15 @@ class DHCP_server(object):
         YIADDR = bytes([0x00, 0x00, 0x00, 0x00])
         SIADDR = bytes([0x00, 0x00, 0x00, 0x00])
         GIADDR = bytes([0x00, 0x00, 0x00, 0x00])
+
         CHADDR1 = bytes([0x00, 0x05, 0x3C, 0x04])
         CHADDR2 = bytes([0x8D, 0x59, 0x00, 0x00])
         CHADDR3 = bytes([0x00, 0x00, 0x00, 0x00])
         CHADDR4 = bytes([0x00, 0x00, 0x00, 0x00])
         CHADDR5 = bytes(192)
+
         Magiccookie = bytes([0x63, 0x82, 0x53, 0x63])
+
         DHCPOptions1 = bytes([53, 1, 5])  # DHCP ACK(value = 5)
         DHCPOptions2 = bytes([1, 4, 0xFF, 0xFF, 0xFF, 0x00])  # 255.255.255.0 subnet mask
         DHCPOptions3 = bytes([3, 4, 0xC0, 0xA8, 0x01, 0x01])  # 192.168.1.1 router
