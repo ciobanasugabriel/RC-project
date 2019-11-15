@@ -4,12 +4,11 @@ import ipaddress
 serverPort = 67
 clientPort = 68
 MAX_BYTES=1024
-
+dest = ('127.0.0.1', clientPort)
 class DHCP_server(object):
     start_ip = ipaddress.IPv4Address('192.168.1.2')
     end_ip = ipaddress.IPv4Address('192.168.1.101')
     addresses = [start_ip]
-    dest = ('127.0.0.1', clientPort)
     for ip_int in range(int(start_ip) + 1, int(end_ip)):
         addresses.append(ipaddress.IPv4Address(ip_int))
     def server(self):
@@ -17,31 +16,24 @@ class DHCP_server(object):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #AF_INET ne da tipul de adresa(IPv4) si SOCK_DGRAM ne indica tipul de socket folosit(UDP)
         s.bind(("127.0.0.1", serverPort))
         while True:
-            try:
-                print("Wait DHCP discovery.")
-                data, address=s.recvfrom(MAX_BYTES)
-                if data.decode("utf-8")=="DHCPDISCOVER":
-                    print(f"DHCP discovery received from {address}")
-                    print("Send DHCP offer.")
-                    dhcpoffer = DHCP_server.offer_get()
-                    s.sendto(dhcpoffer,DHCP_server.dest)
-                    while True:
-                        try:
-                            print("Wait DHCP request.")
-                            data2, address2 = s.recvfrom(MAX_BYTES)
-                            if data2.decode("utf-8") == "DHCPREQUEST":
-                                print(f"DHCP request received from {address2}")
-                                print("Send DHCP pack.")
-                                dhcpreq=DHCP_server.pack_get()
-                                s.sendto(dhcpreq, DHCP_server.dest)
-                                break
-                        except:
-                            raise
-            except:
-                raise
+            print("Wait DHCP discovery.")
+            data, address=s.recvfrom(MAX_BYTES)
+            if data.decode("utf-8")=="DHCPDISCOVER":
+                print(f"DHCP discovery received from {address}")
+                print("Send DHCP offer.")
+                dhcpoffer = DHCP_server.offer_get()
+                s.sendto(dhcpoffer,dest)
+                while True:
+                    print("Wait DHCP request.")
+                    data2, address2 = s.recvfrom(MAX_BYTES)
+                    # if data2.decode("utf-8") == "DHCPREQUEST":
+                    #     print(f"DHCP request received from {address2}")
+                    #     print("Send DHCP pack.")
+                    #     dhcpreq=DHCP_server.pack_get()
+                    #     s.sendto(dhcpreq, dest)
+                    #     break
 
-
-        #DHCPOFFER
+    #DHCPOFFER
     def offer_get():
         OP = bytes([0x02]) #1 for messages sent by a client 2 for messages sent by a server
         HTYPE = bytes([0x01]) #ethernet type is specified when HTYPE=1
@@ -51,8 +43,8 @@ class DHCP_server(object):
         SECS = bytes([0x00, 0x00]) #Filled in by client, seconds elapsed since client started trying to boot.
         FLAGS = bytes([0x00, 0x00]) #can be set to 1 to indicate that messages to the client must be broadcast
         CIADDR = bytes([0x00, 0x00, 0x00, 0x00]) #Client's IP address; set by the client when the client has confirmed that its IP address is valid.
-        YIADDR = bytes([0xC0, 0xA8, 0x01, 0x00])  #Client's IP address; set by the server to inform the client of the client's IP address.
-        SIADDR = bytes([0xC0, 0xA8, 0x01, 0x00])  #IP address of the next server for the client to use in the configuration process
+        YIADDR = bytes([0x00, 0x00, 0x00, 0x00])  #Client's IP address; set by the server to inform the client of the client's IP address.
+        SIADDR = bytes([0x00, 0x00, 0x00, 0x00])  #IP address of the next server for the client to use in the configuration process
         GIADDR = bytes([0x00, 0x00, 0x00, 0x00]) #Relay agent (gateway) IP address; filled in by the relay agent with the address of the interface through which Dynamic Host Configuration Protocol (DHCP) message was received.
 
         #client hardware addresses
@@ -83,8 +75,8 @@ class DHCP_server(object):
         SECS = bytes([0x00, 0x00])
         FLAGS = bytes([0x00, 0x00])
         CIADDR = bytes([0x00, 0x00, 0x00, 0x00])
-        YIADDR = bytes([0xC0, 0xA8, 0x01, 0x00])
-        SIADDR = bytes([0xC0, 0xA8, 0x01, 0x00])
+        YIADDR = bytes([0x00, 0x00, 0x00, 0x00])
+        SIADDR = bytes([0x00, 0x00, 0x00, 0x00])
         GIADDR = bytes([0x00, 0x00, 0x00, 0x00])
         CHADDR1 = bytes([0x00, 0x05, 0x3C, 0x04])
         CHADDR2 = bytes([0x8D, 0x59, 0x00, 0x00])
@@ -101,9 +93,6 @@ class DHCP_server(object):
         package = OP + HTYPE + HLEN + HOPS + XID + SECS + FLAGS + CIADDR + YIADDR + SIADDR + GIADDR + CHADDR1 + CHADDR2 + CHADDR3 + CHADDR4 + CHADDR5 + Magiccookie + DHCPOptions1 + DHCPOptions2 + DHCPOptions3 + DHCPOptions4 + DHCPOptions5
 
         return package
-
-
-
 
 
 if __name__ == '__main__':
