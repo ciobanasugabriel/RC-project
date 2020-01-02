@@ -154,7 +154,7 @@ class DHCP_server(object):
         option54 = bytes([0x12, 0x34, 0x56, 0x78])
 
         # maximum DHCP message size
-        option57 = bytes([0xff, 0xff])
+        option57 = bytes([0x01, 0xff])
 
         # renewal time value
         option58 = received_pack[251:255]
@@ -211,7 +211,7 @@ class DHCP_server(object):
         option54 = bytes([0x12, 0x34, 0x56, 0x78])
 
         # maximum DHCP message size
-        option57 = bytes([0xff, 0xff])
+        option57 = bytes([0x01, 0xff])
 
         # renewal time value
         option58 = received_pack[251:255]
