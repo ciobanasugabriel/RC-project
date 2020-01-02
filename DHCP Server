@@ -1,17 +1,21 @@
 import socket
-import ipaddress
+import time
 
 serverPort = 67
 clientPort = 68
 
-MAX_BYTES=1024
+# numarul maxim de biti pe care se transmite un mesaj
+MAX_BYTES = 1023
 
+# broadcast pentru toti clientii
 dest = ('255.255.255.255', clientPort)
+
 class DHCP_server(object):
-    #start_ip = bytes([0xC0, 0xA8, 0x01, 0x01])
-    #end_ip = bytes([0xC0, 0xA8, 0x01, 0x65])
+
+    # address pool
     addresses = []
-    used_addresses = []
+
+    # adaugam adrese in address pool
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x01]))
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x02]))
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x03]))
@@ -26,12 +30,38 @@ class DHCP_server(object):
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x0c]))
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x0d]))
     addresses.append(bytes([0xC0, 0xA8, 0x01, 0x0e]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x0f]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x10]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x11]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x12]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x13]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x14]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x15]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x16]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x17]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x18]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x19]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1a]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1b]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1c]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1d]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1e]))
+    addresses.append(bytes([0xC0, 0xA8, 0x01, 0x1f]))
 
-    leases=[]
+    # lista cu lease time pentru toate adresele
+    leases = []
     for i in range(1, len(addresses)):
-        leases.append(bytes([51, 4, 0x00, 0x01, 0x51, 0x80]))
+        # default lease time de o zi
+        leases.append(86400)
 
-    ip_and_lease=dict(zip(addresses,leases))
+    # dictionar cu adresa ip si lease time-ul alocat
+    ip_and_lease = dict(zip(addresses, leases))
+
+    # dictionar cu adrese vechi si chaddr specific
+    old_addresses = {}
+
+    # lista cu adrese folosite
+    used_addresses = []
 
     def server(self):
         print("DHCP server is starting")
@@ -40,13 +70,13 @@ class DHCP_server(object):
         while True:
 
             print("Wait DHCP discovery.")
-            data, address=s.recvfrom(MAX_BYTES)
+            data, address = s.recvfrom(MAX_BYTES)
 
-            if data[244:245] == bytes([0x01]): #DHCPDISCOVERY
+            if data[244:245] == bytes([0x01]): #DHCPDISCOVER
                 print(f"DHCP discovery received from {address}")
                 print("Send DHCP offer.")
                 dhcpoffer = DHCP_server.send_offer(self,data) #DHCPOFFER
-                s.sendto(dhcpoffer,dest)
+                s.sendto(dhcpoffer, dest)
 
                 while True:
                     print("Wait DHCP request.")
@@ -54,97 +84,151 @@ class DHCP_server(object):
                     if data2[244:245] == bytes([0x03]): #DHCPREQUEST
                         print(f"DHCP request received from {address2}")
                         print("Send DHCP ack.")
-                        dhcpack= DHCP_server.send_ack(self,data2)     #DHCPACK
+                        dhcpack = DHCP_server.send_ack(self,data2)   #DHCPACK
                         s.sendto(dhcpack, dest)
                         break
+            for address in DHCP_server.used_addresses:
+                DHCP_server.ip_and_lease[address] = DHCP_server.ip_and_lease[address] - 1
+            time.sleep(1)
 
+
+    # DHCPOFFER
     def send_offer(self,received_pack):
         OP = bytes([0x02])  # 1 for messages sent by a client 2 for messages sent by a server
         HTYPE = bytes([0x01])  # ethernet type is specified when HTYPE=1
         HLEN = bytes([0x06])  # for ethernet the value is 6
         HOPS = bytes([0x00])  # Client sets to zero, optionally used by relay-agents
-        XID = bytes([0x39, 0x03, 0xF3, 0x26])  # Transaction ID, a random number chosen by the client, used by the client and server to associate messages and responses between a client and a server.
+        XID = received_pack[4:8]  # Transaction ID, a random number chosen by the client, used by the client and server to associate messages and responses between a client and a server.
         SECS = bytes([0x00, 0x00])  # Filled in by client, seconds elapsed since client started trying to boot.
         FLAGS = bytes([0x00, 0x00])  # can be set to 1 to indicate that messages to the client must be broadcast
-        CIADDR = bytes([0x00, 0x00, 0x00, 0x00])  # Client's IP address; set by the client when the client has confirmed that its IP address is valid.
+        CIADDR = received_pack[12:16]  # Client's IP address; set by the client when the client has confirmed that its IP address is valid.
         YIADDR = bytes([0x00, 0x00, 0x00, 0x00])
-        if received_pack[12:16] == CIADDR:
-            for k in DHCP_server.addresses:
-                if k not in DHCP_server.used_addresses:
-                    YIADDR = k
-                    DHCP_server.used_addresses.append(k)
-                    break
-        else:
-            if received_pack[12:16] in DHCP_server.used_addresses:
-                for k in DHCP_server.addresses:
-                    if k not in DHCP_server.used_addresses:
-                        YIADDR = k
-                        DHCP_server.used_addresses.append(k)
-                        break
-            else:
-                if received_pack[12:16] in DHCP_server.addresses:
-                    YIADDR = received_pack[12:16]
 
         SIADDR = bytes([0x00, 0x00, 0x00, 0x00])  # IP address of the next server for the client to use in the configuration process
         GIADDR = bytes([0x00, 0x00, 0x00, 0x00])  # Relay agent (gateway) IP address; filled in by the relay agent with the address of the interface through which Dynamic Host Configuration Protocol (DHCP) message was received.
 
         # client hardware addresses
-        CHADDR1 = bytes([0x00, 0x05, 0x3C, 0x04])
-        CHADDR2 = bytes([0x8D, 0x59, 0x00, 0x00])
-        CHADDR3 = bytes([0x00, 0x00, 0x00, 0x00])
-        CHADDR4 = bytes([0x00, 0x00, 0x00, 0x00])
+        CHADDR1 = received_pack[28:32]
+        CHADDR2 = received_pack[32:36]
+        CHADDR3 = received_pack[36:40]
+        CHADDR4 = received_pack[40:44]
         CHADDR5 = bytes(192)
 
         Magiccookie = bytes([0x63, 0x82, 0x53, 0x63])
-        pack = OP+HTYPE+HLEN+HOPS+XID+SECS+FLAGS+CIADDR+YIADDR+SIADDR+SIADDR+GIADDR+CHADDR1+CHADDR2+CHADDR3+CHADDR4+CHADDR5+Magiccookie
+
+        old_ip=DHCP_server.get_old_address(received_pack[28:44])
+        if old_ip:
+            YIADDR = old_ip
+        else:
+            if CIADDR == bytes([0x00, 0x00, 0x00, 0x00]):
+                for k in DHCP_server.addresses:
+                    if k not in DHCP_server.used_addresses:
+                        YIADDR = k
+                        break
+            else:
+                if CIADDR in DHCP_server.used_addresses:
+                    for k in DHCP_server.addresses:
+                        if k not in DHCP_server.used_addresses:
+                            YIADDR = k
+                            break
+                else:
+                    if CIADDR in DHCP_server.addresses:
+                        YIADDR = received_pack[12:16]
+
+        # subnet mask
+        # default 255.255.255.0
+        option1 = bytes([0xff, 0xff, 0xff, 0x00])
+        # daca clientul a transmis campul de subnet mask option1 ia valoarea transmisa de el
+        if received_pack[240:244] != bytes([0x00, 0x00, 0x00, 0x00]):
+            option1 = received_pack[240:244]
+
+        # DHCP message type
+        option53 = bytes([0x02]) #DHCPOFFER
+
+        # Lease time
+        option51 = received_pack[241:245]
+        # actualizez lease time-ul si convertesc la int ca sa pot simula scurgerea timpului
+        DHCP_server.ip_and_lease[YIADDR] = int.from_bytes(option51)
+
+        # server identifier
+        option54 = bytes([0x12, 0x34, 0x56, 0x78])
+
+        # maximum DHCP message size
+        option57 = bytes([0xff, 0xff])
+
+        # renewal time value
+        option58 = received_pack[251:255]
+        DHCP_server.ip_and_lease[YIADDR] = int.from_bytes(option58) + DHCP_server.ip_and_lease[YIADDR]
+
+
+
+        pack = OP+HTYPE+HLEN+HOPS+XID+SECS+FLAGS+CIADDR+YIADDR+SIADDR+SIADDR+GIADDR+CHADDR1+CHADDR2+CHADDR3+CHADDR4+CHADDR5+Magiccookie+option1+option53+option51 +option54 + option57 +option58
         return pack
 
 
-    #de refacut
-    def send_ack(self,received_pack):
+    # DHCPACK
+    def send_ack(self, received_pack):
         OP = bytes([0x02])  # 1 for messages sent by a client 2 for messages sent by a server
         HTYPE = bytes([0x01])  # ethernet type is specified when HTYPE=1
         HLEN = bytes([0x06])  # for ethernet the value is 6
         HOPS = bytes([0x00])  # Client sets to zero, optionally used by relay-agents
-        XID = bytes([0x39, 0x03, 0xF3,
-                     0x26])  # Transaction ID, a random number chosen by the client, used by the client and server to associate messages and responses between a client and a server.
+        XID = received_pack[4:8]  # Transaction ID, a random number chosen by the client, used by the client and server to associate messages and responses between a client and a server.
         SECS = bytes([0x00, 0x00])  # Filled in by client, seconds elapsed since client started trying to boot.
         FLAGS = bytes([0x00, 0x00])  # can be set to 1 to indicate that messages to the client must be broadcast
-        CIADDR = bytes([0x00, 0x00, 0x00,
-                        0x00])  # Client's IP address; set by the client when the client has confirmed that its IP address is valid.
-        if received_pack[12:16] == CIADDR:
-            for k in DHCP_server.addresses:
-                if k not in DHCP_server.used_addresses:
-                    YIADDR = k
-                    DHCP_server.used_addresses.append(k)
-                    break
-        else:
-            if received_pack[12:16] in DHCP_server.used_addresses:
-                for k in DHCP_server.addresses:
-                    if k not in DHCP_server.used_addresses:
-                        YIADDR = k
-                        DHCP_server.used_addresses.append(k)
-                        break
-            else:
-                if received_pack[12:16] in DHCP_server.addresses:
-                    YIADDR = received_pack[12:16]
-
-        SIADDR = bytes([0x00, 0x00, 0x00,
-                        0x00])  # IP address of the next server for the client to use in the configuration process
-        GIADDR = bytes([0x00, 0x00, 0x00,
-                        0x00])  # Relay agent (gateway) IP address; filled in by the relay agent with the address of the interface through which Dynamic Host Configuration Protocol (DHCP) message was received.
+        CIADDR = received_pack[12:16]  # Client's IP address; set by the client when the client has confirmed that its IP address is valid.
+        YIADDR = received_pack[16:20]
+        SIADDR = bytes([0x00, 0x00, 0x00, 0x00])  # IP address of the next server for the client to use in the configuration process
+        GIADDR = bytes([0x00, 0x00, 0x00, 0x00])  # Relay agent (gateway) IP address; filled in by the relay agent with the address of the interface through which Dynamic Host Configuration Protocol (DHCP) message was received.
 
         # client hardware addresses
-        CHADDR1 = bytes([0x00, 0x05, 0x3C, 0x04])
-        CHADDR2 = bytes([0x8D, 0x59, 0x00, 0x00])
-        CHADDR3 = bytes([0x00, 0x00, 0x00, 0x00])
-        CHADDR4 = bytes([0x00, 0x00, 0x00, 0x00])
+        CHADDR1 = received_pack[28:32]
+        CHADDR2 = received_pack[32:36]
+        CHADDR3 = received_pack[36:40]
+        CHADDR4 = received_pack[40:44]
         CHADDR5 = bytes(192)
 
         Magiccookie = bytes([0x63, 0x82, 0x53, 0x63])
-        pack = OP + HTYPE + HLEN + HOPS + XID + SECS + FLAGS + CIADDR + YIADDR + SIADDR + SIADDR + GIADDR + CHADDR1 + CHADDR2 + CHADDR3 + CHADDR4 + CHADDR5 + Magiccookie
+
+        DHCP_server.used_addresses.append(CIADDR)
+        DHCP_server.old_addresses.update({CIADDR: received_pack[28:44]})
+
+        # subnet mask
+        # default 255.255.255.0
+        option1 = bytes([0xff, 0xff, 0xff, 0x00])
+        # daca clientul a transmis campul de subnet mask option1 ia valoarea transmisa de el
+        if received_pack[240:244] != bytes([0x00, 0x00, 0x00, 0x00]):
+            option1 = received_pack[240:244]
+
+        # DHCP message type
+        option53 = bytes([0x05])  # DHCPACK
+
+        # Lease time
+        option51 = received_pack[241:245]
+        # actualizez lease time-ul si convertesc la int ca sa pot simula scurgerea timpului
+        DHCP_server.ip_and_lease[YIADDR] = int.from_bytes(option51)
+
+        # server identifier
+        option54 = bytes([0x12, 0x34, 0x56, 0x78])
+
+        # maximum DHCP message size
+        option57 = bytes([0xff, 0xff])
+
+        # renewal time value
+        option58 = received_pack[251:255]
+        DHCP_server.ip_and_lease[YIADDR] = int.from_bytes(option58) + DHCP_server.ip_and_lease[YIADDR]
+
+
+
+        pack = OP + HTYPE + HLEN + HOPS + XID + SECS + FLAGS + CIADDR + YIADDR + SIADDR + SIADDR + GIADDR + CHADDR1 + CHADDR2 + CHADDR3 + CHADDR4 + CHADDR5 + Magiccookie + option1 + option53 + option51 + option54 + option57 + option58
         return pack
 
+    # functie pentru preluarea adresei vechi, daca acel client a mai fost conectat la server, el primeste adresa veche
+    def get_old_address(self, chaddr):
+        if chaddr in self.old_addresses.values():
+            for ip, config in self.old_addresses.items():
+                if config == chaddr:
+                    return ip
+        return None
 
 if __name__ == '__main__':
     dhcp_server = DHCP_server()
