@@ -1,0 +1,106 @@
+from tkinter import *
+import server
+import threading
+
+def OnServer():
+    t1 = threading.Thread(target=server.dhcp_server.startServer)
+    t1.start()
+    server.STOP = 0
+
+def Exit():
+    server.STOP = 1
+
+def Insert(ip):
+    ip_as_bytes = bytes(map(int, ip.split('.')))
+    server.dhcp_server.addresses.insert(0, ip_as_bytes)
+    server.dhcp_server.ip_and_lease.update({ip_as_bytes: 86400})
+
+def setLease(address, lease):
+    old_lease = server.dhcp_server.ip_and_lease[bytes(map(int, address.split('.')))]
+    server.dhcp_server.ip_and_lease[bytes(map(int, address.split('.')))] = lease
+    print(f"Lease time-ul pentru {address} a fost modificat de la {old_lease} la {lease}s")
+
+if __name__ == '__main__':
+
+    window = Tk()
+    window.geometry("800x365")
+    window.title("DHCP_Server")
+    window.resizable(0, 0)
+
+    backgroundPicture = PhotoImage(file = "D:\\Tools\\chestii\\RC-P\\bck-rc.png")
+    backgroundLabel = Label(window, image=backgroundPicture)
+    backgroundLabel.place(x=0, y=0, relwidth=1, relheight=1)
+
+
+
+    startButton = Button(window, text=("Start Server"), command = OnServer)
+    startButton.place(relx=0.025, rely=0.904, height=24, width=70)
+
+
+
+    stopButton = Button(window, text=("Stop Server"), command = Exit)
+    stopButton.place(relx=0.888, rely=0.904, height=24, width=70)
+
+    optionsMessage = Message(window, text=("DHCP Options"))
+    optionsMessage.place(relx=0.05, rely=0.11, relheight=0.063, relwidth=0.113)
+    optionsMessage.configure(width=90)
+    spinBox = Spinbox(window, from_=1.0, to=10.0)
+    spinBox.place(relx=0.025, rely=0.219, relheight=0.052147, relwidth=0.169)
+    activateCheck = Checkbutton(window, text=("Activate"))
+    activateCheck.place(relx=0.038, rely=0.329, relheight=0.068105, relwidth=0.089)
+    configureCheck = Checkbutton(window, text=("Configure"))
+    configureCheck.place(relx=0.038, rely=0.411, relheight=0.068133, relwidth=0.101)
+    deactivateCheck = Checkbutton(window, text=("Deactivate"))
+    deactivateCheck.place(relx=0.038, rely=0.493, relheight=0.068119, relwidth=0.104)
+
+    leaseMessage = Message(window, text="Lease Time")
+    leaseMessage.place(relx=0.3, rely=0.11, relheight=0.063, relwidth=0.088)
+    leaseMessage.configure(width=60)
+    leaseScale = Scale(window, from_=0.0, to=84600.0)
+    leaseScale.configure(length=126, orient="horizontal")
+    leaseScale.place(relx=0.263, rely=0.164, relwidth=0.165, relheight=0.0215, height=42, bordermode='ignore')
+
+
+    poolMessage = Message(window, text="Address Pool")
+    poolMessage.place(relx=0.516, rely=0.111, relheight=0.064185, relwidth=0.135)
+    poolMessage.configure(width=110)
+    poolEntry = Entry(window)
+    poolEntry.place(relx=0.479, rely=0.222,height=20, relwidth=0.201)
+    poolList = Listbox(window)
+    poolList.place(relx=0.479, rely=0.41, relheight=0.396253, relwidth=0.198)
+    insertButton = Button(window, text="Insert", command = lambda: [poolList.insert(END, poolEntry.get()), Insert(poolEntry.get()), poolEntry.delete(0,END)])
+    insertButton.place(relx=0.553, rely=0.301, height=24, width=40)
+
+
+    for ip in server.dhcp_server.addresses:
+        poolList.insert(END,(str(int.from_bytes(ip[0:1], "big"))+"."+str(int.from_bytes(ip[1:2], "big"))+"."+str(int.from_bytes(ip[2:3], "big"))+"."+str(int.from_bytes(ip[3:4], "big"))))
+
+
+
+    scrollList1 = Scrollbar(poolList, orient="vertical")
+    scrollList1.config(command=poolList.yview)
+    scrollList1.pack(side="right", fill="y")
+
+    setButton = Button(window, text="Set", command = lambda: setLease(poolList.get(poolList.curselection()), leaseScale.get()))
+    setButton.place(relx=0.325, rely=0.301, height=24, width=27)
+
+
+    clientMessage = Message(window, text="Client IP")
+    clientMessage.place(relx=0.835, rely=0.111, relheight=0.064195, relwidth=0.071)
+    clientMessage.configure(width=60)
+    clientList = Listbox(window)
+    clientList.place(relx=0.786, rely=0.219, relheight=0.369265, relwidth=0.186)
+    scrollList2 = Scrollbar(clientList, orient="vertical")
+    scrollList2.config(command=clientList.yview)
+    scrollList2.pack(side="right", fill="y")
+
+    for used_ip in server.dhcp_server.used_addresses:
+        clientList.insert(END, (str(int.from_bytes(used_ip[0:1], "big")) + "." + str(int.from_bytes(used_ip[1:2], "big")) + "." + str(int.from_bytes(used_ip[2:3], "big")) + "." + str(int.from_bytes(used_ip[3:4], "big"))))
+
+    window.mainloop()
+
+
+
+
+
+
