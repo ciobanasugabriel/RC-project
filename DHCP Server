@@ -7,6 +7,9 @@ clientPort = 68
 # numarul maxim de biti pe care se transmite un mesaj
 MAX_BYTES = 1023
 
+#Inchidere Server
+STOP = 0
+
 # broadcast pentru toti clientii
 dest = ('255.255.255.255', clientPort)
 
@@ -63,7 +66,7 @@ class DHCP_server(object):
     # lista cu adrese folosite
     used_addresses = []
 
-    def server(self):
+    def startServer(self):
         print("DHCP server is starting")
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #AF_INET ne da tipul de adresa(IPv4) si SOCK_DGRAM ne indica tipul de socket folosit(UDP)
         s.bind(("0.0.0.0", serverPort))
@@ -71,8 +74,10 @@ class DHCP_server(object):
 
             print("Wait DHCP discovery.")
             data, address = s.recvfrom(MAX_BYTES)
-
-            if data[244:245] == bytes([0x01]): #DHCPDISCOVER
+            if STOP == 1:
+                print("Server closed!")
+                break
+            if data[248:249] == bytes([0x01]): #DHCPDISCOVER
                 print(f"DHCP discovery received from {address}")
                 print("Send DHCP offer.")
                 dhcpoffer = DHCP_server.send_offer(self,data) #DHCPOFFER
@@ -81,12 +86,16 @@ class DHCP_server(object):
                 while True:
                     print("Wait DHCP request.")
                     data2, address2 = s.recvfrom(MAX_BYTES)
-                    if data2[244:245] == bytes([0x03]): #DHCPREQUEST
+                    if STOP == 1:
+                        break
+
+                    if data2[248:249] == bytes([0x03]): #DHCPREQUEST
                         print(f"DHCP request received from {address2}")
                         print("Send DHCP ack.")
                         dhcpack = DHCP_server.send_ack(self,data2)   #DHCPACK
                         s.sendto(dhcpack, dest)
                         break
+
             for address in DHCP_server.used_addresses:
                 DHCP_server.ip_and_lease[address] = DHCP_server.ip_and_lease[address] - 1
             time.sleep(1)
@@ -230,6 +239,4 @@ class DHCP_server(object):
                     return ip
         return None
 
-if __name__ == '__main__':
-    dhcp_server = DHCP_server()
-    dhcp_server.server()
+dhcp_server = DHCP_server()
